@@ -19,6 +19,7 @@ type OperationV3 struct {
 	parser              *Parser
 	codeExampleFilesDir string
 	spec.Operation
+	Extensions        map[string]any `json:"-" yaml:"-"`
 	RouterProperties  []RouteProperties
 	responseMimeTypes []string
 }
@@ -132,7 +133,10 @@ func (o *OperationV3) ParseMetadata(attribute, lowerAttribute, lineRemainder str
 			return fmt.Errorf("annotation %s need a valid json value. error: %s", attribute, err.Error())
 		}
 
-		o.Responses.Extensions[attribute[1:]] = valueJSON
+		if o.Extensions == nil {
+			o.Extensions = make(map[string]any)
+		}
+		o.Extensions[attribute[1:]] = valueJSON
 		return nil
 	}
 
@@ -1256,7 +1260,10 @@ func (o *OperationV3) ParseCodeSample(attribute, _, lineRemainder string) error 
 			}
 		}
 
-		o.Responses.Extensions[attribute[1:]] = valueJSON
+		if o.Extensions == nil {
+			o.Extensions = make(map[string]any)
+		}
+		o.Extensions[attribute[1:]] = valueJSON
 
 		return nil
 	}

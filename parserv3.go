@@ -591,7 +591,29 @@ func processRouterOperationV3(p *Parser, o *OperationV3) error {
 			p.debug.Printf("warning: %s\n", err)
 		}
 
+		// Set the operation spec
 		*op = &o.Operation
+
+		// Set extensions on the Extendable wrapper if any exist
+		if o.Extensions != nil {
+			// Find the Extendable wrapper by getting the parent operation
+			switch routeProperties.HTTPMethod {
+			case http.MethodGet:
+				pathItem.Spec.Spec.Get.Extensions = o.Extensions
+			case http.MethodPost:
+				pathItem.Spec.Spec.Post.Extensions = o.Extensions
+			case http.MethodDelete:
+				pathItem.Spec.Spec.Delete.Extensions = o.Extensions
+			case http.MethodPut:
+				pathItem.Spec.Spec.Put.Extensions = o.Extensions
+			case http.MethodPatch:
+				pathItem.Spec.Spec.Patch.Extensions = o.Extensions
+			case http.MethodHead:
+				pathItem.Spec.Spec.Head.Extensions = o.Extensions
+			case http.MethodOptions:
+				pathItem.Spec.Spec.Options.Extensions = o.Extensions
+			}
+		}
 
 		p.openAPI.Paths.Spec.Paths[routeProperties.Path] = pathItem
 	}
