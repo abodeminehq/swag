@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/swaggo/swag/v2/example/basic/api"
+	"github.com/abodeminehq/swag/v2/example/basic/api"
 )
 
 // @title Swagger Example API

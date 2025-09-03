@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/abodeminehq/swag/v2/example/celler/httputil"
+	"github.com/abodeminehq/swag/v2/example/celler/model"
 	"github.com/gin-gonic/gin"
-	"github.com/swaggo/swag/v2/example/celler/httputil"
-	"github.com/swaggo/swag/v2/example/celler/model"
 )
 
 // ShowBottle godoc
