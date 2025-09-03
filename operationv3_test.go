@@ -2028,7 +2028,7 @@ func TestParseCodeSamplesV3(t *testing.T) {
 
 		assert.Equal(t, "example", operation.Summary)
 		assert.Equal(t, CodeSamples(CodeSamples{map[string]string{"lang": "JavaScript", "source": "console.log('Hello World');"}}),
-			operation.Responses.Extensions["x-codeSamples"],
+			operation.Extensions["x-codeSamples"],
 		)
 	})
 
