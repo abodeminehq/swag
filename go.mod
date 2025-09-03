@@ -1,4 +1,4 @@
-module github.com/abodemine/swag/v2
+module github.com/abodeminehq/swag/v2
 
 go 1.18
 
