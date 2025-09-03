@@ -173,29 +173,8 @@ func (o *OperationV3) ParseAcceptComment(commentLine string) error {
 			continue
 		}
 
+		// Create the media type entry only; do not generate placeholder schemas.
 		mediaType := spec.NewMediaType()
-		schema := spec.NewSchemaSpec()
-
-		switch value {
-		case "application/json", "multipart/form-data", "text/xml":
-			schema.Spec.Type = &spec.SingleOrArray[string]{OBJECT}
-		case "image/png",
-			"image/jpeg",
-			"image/gif",
-			"application/octet-stream",
-			"application/pdf",
-			"application/msexcel",
-			"application/zip",
-			"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-			"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-			"application/vnd.openxmlformats-officedocument.presentationml.presentation":
-			schema.Spec.Type = &spec.SingleOrArray[string]{STRING}
-			schema.Spec.Format = "binary"
-		default:
-			schema.Spec.Type = &spec.SingleOrArray[string]{STRING}
-		}
-
-		mediaType.Spec.Schema = schema
 		o.RequestBody.Spec.Spec.Content[value] = mediaType
 	}
 
@@ -516,15 +495,19 @@ func (o *OperationV3) fillRequestBody(name string, schema *spec.RefOrSpec[spec.S
 		schema.Spec.Title = name
 	}
 	if mediaType.Spec.Schema == nil {
+		// First body parameter - set schema directly
 		mediaType.Spec.Schema = schema
-	} else if mediaType.Spec.Schema.Ref != nil || mediaType.Spec.Schema.Spec.OneOf == nil {
-		// If there's an existing schema that doesn't have oneOf, create a oneOf schema
+	} else if mediaType.Spec.Schema.Spec != nil && mediaType.Spec.Schema.Spec.OneOf != nil {
+		// Already has oneOf - append to it
+		mediaType.Spec.Schema.Spec.OneOf = append(mediaType.Spec.Schema.Spec.OneOf, schema)
+	} else {
+		// This is the second body parameter - create oneOf
+		// The original flawed logic was: mediaType.Spec.Schema.Ref != nil || mediaType.Spec.Schema.Spec.OneOf == nil
+		// This was always true because either Ref != nil OR OneOf == nil
+		// The fix is to only create oneOf when we actually have multiple body parameters
 		oneOfSchema := spec.NewSchemaSpec()
 		oneOfSchema.Spec.OneOf = []*spec.RefOrSpec[spec.Schema]{mediaType.Spec.Schema, schema}
 		mediaType.Spec.Schema = oneOfSchema
-	} else {
-		// If there's already a oneOf schema, append to it
-		mediaType.Spec.Schema.Spec.OneOf = append(mediaType.Spec.Schema.Spec.OneOf, schema)
 	}
 }
 

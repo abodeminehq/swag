@@ -1136,6 +1136,128 @@ func TestParseParamCommentByBodyTypeWithDeepNestedFieldsV3(t *testing.T) {
 	assert.Equal(t, 3, len(operation.parser.openAPI.Components.Spec.Schemas))
 }
 
+func TestSingleBodyParameterOneOfIssue(t *testing.T) {
+	t.Run("Single body parameter called twice should NOT create oneOf", func(t *testing.T) {
+		comment := `@Param request body model.TestRequest true "Test request body"`
+		operation := NewOperationV3(New())
+
+		// Add a mock type
+		operation.parser.addTestType("model.TestRequest")
+
+		// Parse the SAME comment twice (simulating duplicate processing)
+		err := operation.ParseComment(comment, nil)
+		assert.NoError(t, err)
+
+		err = operation.ParseComment(comment, nil)
+		assert.NoError(t, err)
+
+		requestBody := operation.RequestBody
+		assert.NotNil(t, requestBody)
+
+		requestBodySpec := requestBody.Spec.Spec
+		assert.NotNil(t, requestBodySpec)
+
+		// Check that the schema is a direct reference, NOT a oneOf
+		mediaType := requestBodySpec.Content["application/json"]
+		assert.NotNil(t, mediaType)
+		assert.NotNil(t, mediaType.Spec.Schema)
+
+		// After fix: Should NOT create oneOf for duplicate body params
+		if mediaType.Spec.Schema.Ref != nil {
+			assert.Equal(t, "#/components/schemas/model.TestRequest", mediaType.Spec.Schema.Ref.Ref)
+		} else if mediaType.Spec.Schema.Spec != nil && mediaType.Spec.Schema.Spec.OneOf != nil {
+			assert.Fail(t, "Single body param called twice should NOT create oneOf")
+		}
+	})
+
+	t.Run("Single body parameter should NOT create oneOf", func(t *testing.T) {
+		comment := `@Param request body model.TestRequest true "Test request body"`
+		operation := NewOperationV3(New())
+
+		// Add a mock type
+		operation.parser.addTestType("model.TestRequest")
+
+		err := operation.ParseComment(comment, nil)
+		assert.NoError(t, err)
+
+		requestBody := operation.RequestBody
+		assert.NotNil(t, requestBody)
+
+		requestBodySpec := requestBody.Spec.Spec
+		assert.NotNil(t, requestBodySpec)
+		assert.Equal(t, "Test request body", requestBodySpec.Description)
+		assert.True(t, requestBodySpec.Required)
+
+		// Check that the schema is a direct reference, NOT a oneOf
+		mediaType := requestBodySpec.Content["application/json"]
+		assert.NotNil(t, mediaType)
+		assert.NotNil(t, mediaType.Spec.Schema)
+
+		// This should be a direct reference, not oneOf
+		if mediaType.Spec.Schema.Ref != nil {
+			assert.Equal(t, "#/components/schemas/model.TestRequest", mediaType.Spec.Schema.Ref.Ref)
+			// This should NOT have oneOf when there's a direct ref
+			if mediaType.Spec.Schema.Spec != nil {
+				assert.Nil(t, mediaType.Spec.Schema.Spec.OneOf, "Single body param should NOT have oneOf")
+			}
+		} else if mediaType.Spec.Schema.Spec != nil {
+			// If it's not a ref, check if it incorrectly has oneOf
+			if mediaType.Spec.Schema.Spec.OneOf != nil {
+				assert.Fail(t, "Single body param should NOT have oneOf")
+			}
+		}
+	})
+
+	t.Run("Multiple body parameters SHOULD create oneOf", func(t *testing.T) {
+		operation := NewOperationV3(New())
+
+		// Add mock types
+		operation.parser.addTestType("model.TypeA")
+		operation.parser.addTestType("model.TypeB")
+		operation.parser.addTestType("model.TypeC")
+
+		// Parse multiple body parameters
+		comments := []string{
+			`@Param typeA body model.TypeA false "Type A description"`,
+			`@Param typeB body model.TypeB false "Type B description"`,
+			`@Param typeC body model.TypeC false "Type C description"`,
+		}
+
+		for _, comment := range comments {
+			err := operation.ParseComment(comment, nil)
+			assert.NoError(t, err)
+		}
+
+		requestBody := operation.RequestBody
+		assert.NotNil(t, requestBody)
+
+		requestBodySpec := requestBody.Spec.Spec
+		assert.NotNil(t, requestBodySpec)
+
+		// Check that the schema is oneOf
+		mediaType := requestBodySpec.Content["application/json"]
+		assert.NotNil(t, mediaType)
+		assert.NotNil(t, mediaType.Spec.Schema)
+
+		// This should have oneOf with 3 elements
+		assert.NotNil(t, mediaType.Spec.Schema.Spec, "Multiple body params should have oneOf schema")
+		assert.NotNil(t, mediaType.Spec.Schema.Spec.OneOf, "Multiple body params should have oneOf")
+		assert.Len(t, mediaType.Spec.Schema.Spec.OneOf, 3, "Should have 3 oneOf options")
+
+		// Verify the oneOf references
+		expectedRefs := []string{
+			"#/components/schemas/model.TypeA",
+			"#/components/schemas/model.TypeB",
+			"#/components/schemas/model.TypeC",
+		}
+
+		for i, expectedRef := range expectedRefs {
+			assert.NotNil(t, mediaType.Spec.Schema.Spec.OneOf[i].Ref)
+			assert.Equal(t, expectedRef, mediaType.Spec.Schema.Spec.OneOf[i].Ref.Ref)
+		}
+	})
+}
+
 func TestParseParamCommentByBodyTypeArrayOfPrimitiveGoV3(t *testing.T) {
 	t.Parallel()
 
@@ -1973,10 +2095,10 @@ func TestParseAcceptCommentV3(t *testing.T) {
 		assert.NotNil(t, content[key])
 	}
 
-	assert.Equal(t, &typeObject, content["application/json"].Spec.Schema.Spec.Type)
-	assert.Equal(t, &typeObject, content["text/xml"].Spec.Schema.Spec.Type)
-	assert.Equal(t, &typeString, content["image/png"].Spec.Schema.Spec.Type)
-	assert.Equal(t, "binary", content["image/png"].Spec.Schema.Spec.Format)
+	// No placeholder schemas should be generated by @Accept; schemas are set by explicit @Param.
+	assert.Nil(t, content["application/json"].Spec.Schema)
+	assert.Nil(t, content["text/xml"].Spec.Schema)
+	assert.Nil(t, content["image/png"].Spec.Schema)
 }
 
 func TestParseAcceptCommentErrV3(t *testing.T) {
